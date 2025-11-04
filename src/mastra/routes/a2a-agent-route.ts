@@ -32,33 +32,39 @@ export const a2aAgentRoute = registerApiRoute("/a2a/agent/:agentId", {
           {
             jsonrpc: "2.0",
             id: requestId,
-            error: { code: -32602, message: `Agent '${agentId}' not found` },
+            error: {
+              code: -32602,
+              message: `Agent '${agentId}' not found`,
+            },
           },
           404
         );
       }
 
       const { message, messages, contextId, taskId } = params || {};
-      let messagesList: any[] = [];
+      let messagesList = [];
+
       if (message) messagesList = [message];
-      else if (Array.isArray(messages)) messagesList = messages;
+      else if (messages && Array.isArray(messages)) messagesList = messages;
 
       const mastraMessages = messagesList.map((msg) => ({
         role: msg.role,
         content:
           msg.parts
-            ?.map((part: any) => {
-              if (part.kind === "text") return part.text;
-              if (part.kind === "data") return JSON.stringify(part.data);
-              return "";
-            })
+            ?.map((part: { kind?: string; text?: string; data?: unknown }) =>
+              part.kind === "text"
+                ? part.text
+                : part.kind === "data"
+                ? JSON.stringify(part.data)
+                : ""
+            )
             .join("\n") || "",
       }));
 
       const response = await agent.generate(mastraMessages);
       const agentText = response.text || "";
 
-      const artifacts: any[] = [
+      const artifacts = [
         {
           artifactId: randomUUID(),
           name: `${agentId}Response`,
@@ -66,19 +72,19 @@ export const a2aAgentRoute = registerApiRoute("/a2a/agent/:agentId", {
         },
       ];
 
-      if (response.toolResults && response.toolResults.length > 0) {
+      if (response.toolResults?.length > 0) {
         artifacts.push({
           artifactId: randomUUID(),
           name: "ToolResults",
-          parts: response.toolResults.map((r: any) => ({
-            kind: "data",
-            data: r,
+          parts: response.toolResults.map((result) => ({
+            kind: "text",
+            text: JSON.stringify(result),
           })),
         });
       }
 
       const history = [
-        ...messagesList.map((msg: any) => ({
+        ...messagesList.map((msg) => ({
           kind: "message",
           role: msg.role,
           parts: msg.parts,
@@ -115,7 +121,14 @@ export const a2aAgentRoute = registerApiRoute("/a2a/agent/:agentId", {
           kind: "task",
         },
       });
-    } catch (error: any) {
+    } catch (error) {
+      const errorDetails =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+          ? error
+          : JSON.stringify(error);
+
       return c.json(
         {
           jsonrpc: "2.0",
@@ -123,7 +136,7 @@ export const a2aAgentRoute = registerApiRoute("/a2a/agent/:agentId", {
           error: {
             code: -32603,
             message: "Internal error",
-            data: { details: error?.message || String(error) },
+            data: { details: errorDetails },
           },
         },
         500
