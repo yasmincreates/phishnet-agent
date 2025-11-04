@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": "test-001",
+  "method": "execute",
+  "params": {
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "Please analyze this link: http://example.com/login"
+          }
+        ]
+      }
+    ]
+  }
+}
